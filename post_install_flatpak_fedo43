@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# Script d'Installation Automatisée des Applications Flatpak (Fedora 43)
+# Auteur : Franck Bailliet & AI Perplexity
+# Licence : GNU General Public License v3.0
+# Date : 2025-12-02
+#
+# Ce script installe automatiquement toutes les applications Flatpak disponibles
+# depuis Flathub en contournant les limitations spécifiques à Fedora 43.
+#
+# AVERTISSEMENT : Installation massive ! Plusieurs Go d'espace requis.
+
+# === CONFIGURATION ===
+FLATHUB_REPO="https://flathub.org/repo/flathub.flatpakrepo"
+
+# === FONCTIONS ===
+update_metadata() {
+    echo "📡 Mise à jour des métadonnées AppStream..."
+    flatpak remote-add --if-not-exists flathub "$FLATHUB_REPO"
+    flatpak update --appstream
+    flatpak repair
+}
+
+extract_app_ids() {
+    # Méthode ultra-robuste : extraction des vrais IDs Flatpak depuis search *
+    flatpak search "*" | \
+    grep -oE '[a-z][a-z0-9]*\.[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+' | \
+    grep -v '\.$' | \
+    sort | uniq
+}
+
+install_app() {
+    local app_id="$1"
+    echo "📦 Installation de $app_id ..."
+    printf '0\ny\ny\ny\n' | flatpak install -y flathub "$app_id" 2>/dev/null || \
+    echo "⚠️  Erreur sur $app_id, continuation..."
+}
+
+show_stats() {
+    echo "=== 📊 STATISTIQUES FINALES ==="
+    echo "Apps installées : $(flatpak list --app | wc -l)"
+    echo "Espace utilisé :"
+    du -sh /var/lib/flatpak/ 2>/dev/null || echo "var/lib/flatpak : ?"
+    du -sh ~/.local/share/flatpak/ 2>/dev/null || echo "~/.local/share/flatpak : ?"
+}
+
+# === SCRIPT PRINCIPAL ===
+echo "🚀 Flatpak Mass Install - Fedora 43 Edition"
+echo "=========================================="
+
+update_metadata
+
+apps=$(extract_app_ids)
+app_count=$(echo "$apps" | wc -l)
+
+echo "📋 $(echo "$apps" | wc -l) applications trouvées"
+echo "Exemples : $(echo "$apps" | head -5 | tr '\n' ' ')..."
+echo
+
+total=$(echo "$apps" | wc -l)
+counter=0
+
+for app in $apps; do
+    ((counter++))
+    echo "[$counter/$total] $(install_app "$app")"
+done
+
+show_stats
+echo "✅ Installation terminée !"
+echo ""
+echo "Pour lancer une app : flatpak run com.exemple.App"
+echo "Pour lister : flatpak list --app"
